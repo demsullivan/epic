@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
+	"github.com/demsullivan/owl"
 	"time"
 )
 
@@ -451,6 +452,80 @@ func NewUUIDHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(uuid); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+}
+
+func ForgotPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.Body.Close(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var inputUser User
+	var dbUser *User
+	var msg owl.Message
+	var msgParams owl.Params
+	var newPass string
+
+	if err := json.Unmarshal(body, &inputUser); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	if inputUser.Email == "" {
+		http.Error(w, "Invalid e-mail address!", http.StatusBadRequest)
+		return
+	}
+
+	if inputUser.AppID.String() == "" {
+		http.Error(w, "Invalid app ID!", http.StatusBadRequest)
+		return
+	}
+
+	dbUser, err = GetUserByEmail(inputUser.Email, inputUser.AppID.String())
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	newPass = generatePassword()
+
+	toEmails := []string{""}
+	toEmails[0] = dbUser.Email
+
+	msg.From = "noreply@schuttsports.com"
+	msg.To = toEmails
+	msg.Subject = "Schutt Sports Password Reset Request"
+	msg.Body = "Hello,\n" +
+			   "You are receiving this e-mail because you requested your admin password for schuttsports.com to be reset.\n\n" +
+			   "Your new password is " + newPass + ". Please login using your username " +
+			   "and this new password at https://schuttsports.com/login"
+
+	msgParams.Provider = owl.AWSSES
+
+	err = msg.Send(&msgParams)
+
+	if err != nil {
+		http.Error(w, "msg.Send | " + err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = UpdatePassword(newPass, dbUser.ID.String())
+
+	if err != nil {
+		http.Error(w, "UpdatePassword | " + err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(struct{}{}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return		
 	}
 }
 
