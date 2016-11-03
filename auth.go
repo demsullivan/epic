@@ -173,6 +173,21 @@ func GetUser(id string, appID string) (*User, error) {
 	return u, nil
 }
 
+func GetUserByEmail(email string, appID string) (*User, error) {
+	user := &User{}
+
+	stmt, err := db.Prepare("select epic_user.id, epic_user.first_name, epic_user.last_name, epic_user.email, epic_user.username from epic.user as epic_user inner join epic.application_user on application_user.user_id = epic_user.id where epic_user.email = $1 and application_user.application_id = $2")
+	if err != nil {
+		return nil, errors.New("Prepare select from user | " + err.Error())
+	}
+	defer stmt.Close()
+	err = stmt.QueryRow(email, appID).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Username)
+	if err != nil {
+		return nil, errors.New("QueryRow / Scan select from user | " + err.Error())
+	}
+	return user, nil
+}
+
 func GetAllUsers(appID string) ([]User, error) {
 	var users []User
 	stmt, err := db.Prepare("select epic_user.id, epic_user.first_name, epic_user.last_name, epic_user.email, epic_user.username from epic.user as epic_user inner join epic.application_user on application_user.user_id = epic_user.id where application_user.application_id = $1")
@@ -314,6 +329,15 @@ func createSalt(size int) (string, error) {
 	}
 	//    return string(b), nil
 	return base64.StdEncoding.EncodeToString(b), nil
+}
+
+func generatePassword() string {
+	// converting a uuid to base64 string seems like the easiest way to get a random alphanumeric string for a new password.
+	var base64Passwd string
+
+	base64Passwd = base64.StdEncoding.EncodeToString(uuid.NewV4().Bytes())
+
+	return base64Passwd[0:len(base64Passwd)-2] // shave off the trailing ==
 }
 
 func validatePassword(password string) error {
