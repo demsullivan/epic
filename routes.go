@@ -115,12 +115,12 @@ var routes = Routes{
 		"/auth/user/password",
 		UpdatePasswordHandler,
 	},
-	//Route{
-	//	"ForgotPassword",
-	//	"POST",
-	//	"/auth/user/password",
-	//	ForgotPasswordHandler,
-	//},
+	Route{
+		"ForgotPassword",
+		"POST",
+		"/auth/user/password",
+		ForgotPasswordHandler,
+	},
 	Route{
 		"UserCryptoBootstrap",
 		"POST",
